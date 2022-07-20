@@ -1,0 +1,5 @@
+state variables or the variables declared at the top of the contract are loaded in storage
+r they use storage( which is very costly) writing convention for storage variables is e.g for 
+name it is s_name;
+the variables that are defined in function are loaded in memory and donot cost much of gas
+constant and immutable variables donot cost any Gas

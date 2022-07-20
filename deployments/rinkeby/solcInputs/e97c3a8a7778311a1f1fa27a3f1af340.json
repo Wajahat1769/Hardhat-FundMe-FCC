@@ -1,0 +1,41 @@
+{
+  "language": "Solidity",
+  "sources": {
+    "contracts/FundMe.sol": {
+      "content": "//contract where users can pay\n// we can withdraw\n\n//SPDX-License-Identifier:MIT\npragma solidity ^0.8.4;\nimport \"@chainlink/contracts/src/v0.8/interfaces/AggregatorV3Interface.sol\";\nimport \"./library.sol\";\nerror NotOwner(); //https://blog.soliditylang.org/2021/04/21/custom-errors/\n\ncontract FundMe {\n    /*How to make a contract gas efficient?\n    constant and immutable concept\n    custom error (using if and revert() instead of require)\n  */\n    using PriceConverter for uint256;\n    address[] public addressArray;\n    mapping(address => uint256) public addressToFunding;\n    uint public constant minimumUSD = 50 * 1e18; // constant keyword for gas efficiency\n    address public immutable owner; // gas efficiency\n    AggregatorV3Interface public priceFeed;\n\n    constructor(address priceFeedAddress) {\n        // constructor setting owner whoever deployed the contract\n        //address msgSender=_msgSender();\n        owner = msg.sender;\n        priceFeed = AggregatorV3Interface(priceFeedAddress);\n    }\n\n    // function _msgSender()internal view returns (address){\n    //   return msg.sender;\n    // }\n\n    function fund() public payable {\n        // \"payable\" keyword makes a function payable\n        // we want to recieve ether in our wallets and we want it should be greater than 1\n        require(\n            msg.value.getConversionRate(priceFeed) >= minimumUSD,\n            \"Not Enough\"\n        );\n        addressArray.push(msg.sender); //msg.sender contains sender address\n        addressToFunding[msg.sender] = msg.value; // storing the funding across the address\n        // if user didn't fund minimum ether the \"not enough message will be displayed\"\n        // and all the progress will be reverted and transaction will be cancelled\n        // 'require' keyword makes sure the above condition\n    }\n\n    /*function getBitcoinPrice() public view returns (uint256){\n      //website : https://docs.chain.link/docs/ethereum-addresses/\n      //btc/usd chainlink rinkby test net address:\t0xECe365B379E1dD183B20fc5f022230C044d51404\n      AggregatorV3Interface obj = AggregatorV3Interface(0xECe365B379E1dD183B20fc5f022230C044d51404);\n      (,int price,,,)=obj.latestRoundData();\n      return uint256(price);\n    }\n\n    function getBTCConversion(uint256 btcAmount) public view returns(uint){\n      uint256 btcPrice=getBitcoinPrice();\n      uint256 amountPrice=(btcAmount*btcPrice)/1e8;\n      return amountPrice;\n    }\n  */\n    function withDraw() public onlyOwner {\n        // using only owner as modifier\n\n        for (uint i = 0; i < addressArray.length; i++) {\n            addressToFunding[addressArray[i]] = 0;\n        }\n        addressArray = new address[](0);\n\n        //transfering native token to contract creator\n        //3 ways\n        //transfer\n        //send\n        //call\n        //send\n        // reference : https://solidity-by-example.org/sending-ether\n        // payable(msg.sender).send(address(this).balance);\n        // //transfer\n        // bool flag=payable(msg.sender).transfer(address(this).balance);\n        // require(flag,\"Error\");\n        //call\n        (bool flag2, ) = payable(msg.sender).call{value: address(this).balance}(\n            \"\"\n        );\n        require(flag2, \"Error aa gia\");\n    }\n\n    /*\n     any function using this modifier will first check if call is made by contract owner if yes\n     then it will execute the contract \n    \n    */\n    modifier onlyOwner() {\n        if (msg.sender != owner) {\n            revert NotOwner();\n        }\n        _;\n    }\n\n    //receive() and fallback()\n    /*\n     what if someone sends your contract some eth without calling fund function\n     and you want to record everyone who funded to award them\n     in such scenario\n     if eth or any native token is sent receive() special function will be triggered\n     receive() external payable{\n       }\n       and what if someone sends some data to cater that fallback() is used\n       fallback() external payable{\n       }\n    */\n    receive() external payable {\n        fund();\n    }\n\n    fallback() external payable {\n        fund();\n    }\n}\n"
+    },
+    "@chainlink/contracts/src/v0.8/interfaces/AggregatorV3Interface.sol": {
+      "content": "// SPDX-License-Identifier: MIT\npragma solidity ^0.8.0;\n\ninterface AggregatorV3Interface {\n  function decimals() external view returns (uint8);\n\n  function description() external view returns (string memory);\n\n  function version() external view returns (uint256);\n\n  // getRoundData and latestRoundData should both raise \"No data present\"\n  // if they do not have data to report, instead of returning unset values\n  // which could be misinterpreted as actual reported values.\n  function getRoundData(uint80 _roundId)\n    external\n    view\n    returns (\n      uint80 roundId,\n      int256 answer,\n      uint256 startedAt,\n      uint256 updatedAt,\n      uint80 answeredInRound\n    );\n\n  function latestRoundData()\n    external\n    view\n    returns (\n      uint80 roundId,\n      int256 answer,\n      uint256 startedAt,\n      uint256 updatedAt,\n      uint80 answeredInRound\n    );\n}\n"
+    },
+    "contracts/library.sol": {
+      "content": "//SPDX-License-Identifier:MIT\npragma solidity ^0.8.4;\nimport \"@chainlink/contracts/src/v0.8/interfaces/AggregatorV3Interface.sol\";\n\n//creating a library\nlibrary PriceConverter {\n    // function getVersion() internal view returns (uint256) {\n    //     //address 0x8A753747A1Fa494EC906cE90E9f37563A8AF630e\n    //     AggregatorV3Interface priceFeed = AggregatorV3Interface(\n    //         0x8A753747A1Fa494EC906cE90E9f37563A8AF630e\n    //     );\n    //     return priceFeed.version();\n    // }\n\n    function getPrice(AggregatorV3Interface obj)\n        internal\n        view\n        returns (uint256)\n    {\n        AggregatorV3Interface priceFeed = obj;\n        (\n            ,\n            /*uint80 roundID*/\n            int price, /*uint startedAt*/ /*uint timeStamp*/ /*uint80 answeredInRound*/\n            ,\n            ,\n\n        ) = priceFeed.latestRoundData();\n        return uint256(price * 1e10);\n    }\n\n    function getConversionRate(\n        uint256 ethAmount,\n        AggregatorV3Interface priceFeed\n    ) internal view returns (uint256) {\n        uint256 ethPrice = getPrice(priceFeed);\n        uint256 ethAmountInUSD = (ethAmount * ethPrice) / 1e18;\n        return ethAmountInUSD;\n    }\n}\n"
+    }
+  },
+  "settings": {
+    "optimizer": {
+      "enabled": false,
+      "runs": 200
+    },
+    "outputSelection": {
+      "*": {
+        "*": [
+          "abi",
+          "evm.bytecode",
+          "evm.deployedBytecode",
+          "evm.methodIdentifiers",
+          "metadata",
+          "devdoc",
+          "userdoc",
+          "storageLayout",
+          "evm.gasEstimates"
+        ],
+        "": [
+          "ast"
+        ]
+      }
+    },
+    "metadata": {
+      "useLiteralContent": true
+    }
+  }
+}

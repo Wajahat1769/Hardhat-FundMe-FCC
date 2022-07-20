@@ -1,0 +1,12 @@
+we are gonna do two types of testing
+
+1-Unit testing
+
+  We will divide our code in small testing units and perform tests
+  Testing will be done on 
+  1-Local hardhat network
+  2-Forked hardhatr network
+
+2-Staging
+
+it's like the last stage for testing e.g at a live testnet(e.g Rinkeby)
